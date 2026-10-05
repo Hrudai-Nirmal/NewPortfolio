@@ -53,8 +53,9 @@ export function createParticleScene(canvas: HTMLCanvasElement, onError: (message
       fragmentShader: `varying vec2 vUv; uniform float uOpacity;
         void main() {
           float radius = length(vUv * 2.0 - 1.0);
-          float ring = 1.0 - smoothstep(.012, .035, abs(radius - .92));
-          gl_FragColor = vec4(vec3(.72, .76, .78), ring * uOpacity);
+          float outerRing = 1.0 - smoothstep(.02, .065, abs(radius - .90));
+          float innerRing = 1.0 - smoothstep(.015, .045, abs(radius - .62));
+          gl_FragColor = vec4(vec3(.86, .89, .90), (outerRing + innerRing * .45) * uOpacity);
         }`,
     });
     const ring = new THREE.Mesh(rippleGeometry, rippleMaterial);

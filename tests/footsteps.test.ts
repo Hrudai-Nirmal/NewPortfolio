@@ -8,7 +8,9 @@ test('a contact expands and fades once per stride, with a quiet interval before 
   const impact = getFootstepRipple(.23, 1.15, contact, 0, false);
   const expanding = getFootstepRipple(.4, 1.15, contact, 0, false);
   assert.ok(expanding.radius > impact.radius);
-  assert.ok(expanding.opacity > 0 && expanding.opacity <= .2);
+  assert.ok(expanding.opacity >= .3 && expanding.opacity <= .65, 'the ripple should remain clearly visible after impact');
+  assert.ok(expanding.radius > .25, 'the ring should spread beyond the shoe');
+  assert.ok(getFootstepRipple(.80, 1.15, contact, 0, false).opacity > 0, 'retain a longer visible tail');
   assert.equal(getFootstepRipple(.9, 1.15, contact, 0, false).opacity, 0);
   assert.equal(getFootstepRipple(.4, 1.15, contact, .5, false).opacity, 0);
   assert.equal(getFootstepRipple(.4, 1.15, contact, 0, true).opacity, 0);

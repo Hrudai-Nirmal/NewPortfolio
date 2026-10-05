@@ -29,7 +29,7 @@ Eighteen tests cover deterministic aircraft, finite targets, valid allocation, m
 - 18,000 points on desktop, 10,000 on mobile at initialization; device pixel ratio capped at 1.75.
 - Human particles are sampled deterministically from 32,600 mesh vertices animated by 65 bones. A 32-frame, 4.65 MB local half-float texture stores positions and surface lighting; only two texture reads per particle are needed each frame. Source textures and the raw mesh are never sent to the browser.
 - `npm run bake:human` rebuilds `public/motion/human-walk.bin` and `lib/foot-contacts.json` from the offline sources. See `assets/source/NOTICE.md` for provenance. Loading is abortable and has an explicit error state.
-- Bind-space tailoring raises and tapers the waist, slightly broadens the upper torso, and reduces both feet by 10%. Subtle ground ripples follow measured foot contact and fade before the airplane chapter.
+- Bind-space tailoring preserves the source waist height and width, adds only 2% upper-torso width, and reduces both feet by 10%. Brighter double-ring ground ripples follow measured foot contact and fade before the airplane chapter.
 - No new runtime dependencies, postprocessing or physics libraries.
 - WebGL initialization, shader failure and lost-context states show explicit recovery messages. GPU resources and event listeners are disposed on unmount.
 

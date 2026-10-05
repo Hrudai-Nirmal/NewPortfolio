@@ -6,18 +6,17 @@ function getSmoothBump(height: number, center: number, radius: number) {
   return offset >= 1 ? 0 : (1 - offset * offset) ** 3;
 }
 
-/** Mutate a bind-pose point into a subtly athletic silhouette, keeping head and ground anchors fixed. */
+/** Preserve the source anatomical landmarks and waist volume, with only subtle upper-torso definition. */
 export function reshapeHumanPoint(point: Vector3, bounds: Box3): Vector3 {
   const height = bounds.max.y - bounds.min.y;
   if (![point.x, point.y, point.z, ...bounds.min.toArray(), ...bounds.max.toArray()].every(Number.isFinite) || height <= 0) throw new RangeError('Finite coordinates and nonempty body bounds are required.');
   const relativeHeight = (point.y - bounds.min.y) / height;
-  const waist = getSmoothBump(relativeHeight, .53, .17);
   const chest = getSmoothBump(relativeHeight, .72, .13);
   const centerX = (bounds.min.x + bounds.max.x) / 2;
   const centerZ = (bounds.min.z + bounds.max.z) / 2;
-  point.x = centerX + (point.x - centerX) * (1 - .16 * waist + .08 * chest);
-  point.z = centerZ + (point.z - centerZ) * (1 - .17 * waist + .04 * chest);
-  point.y += height * .035 * getSmoothBump(relativeHeight, .53, .31);
+  point.x = centerX + (point.x - centerX) * (1 + .02 * chest);
+  point.z = centerZ + (point.z - centerZ) * (1 + .01 * chest);
+  // Keep the authored ribcage/pelvis spacing; raising this region also lengthened the legs and pinched the torso.
   return point;
 }
 
