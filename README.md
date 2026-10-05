@@ -19,7 +19,7 @@ npm run typecheck
 npm run build
 ```
 
-Eighteen tests cover deterministic aircraft, finite targets, valid allocation, morph endpoints, pausing, responsive framing, accessible markup, timeline refresh, skinned human continuity, grounded stride, binary asset validation, surface lighting, posture alignment, athletic proportions, foot sizing, footfall timing, ripple decay and hover behavior. The test suite uses Node's runner through tsx. See context.md for reference research, decisions, TDD evidence and known limits.
+Twenty tests cover deterministic aircraft, finite targets, valid allocation, morph endpoints, pausing, responsive framing, accessible markup, timeline refresh, skinned human continuity, grounded stride, binary asset validation, surface lighting, posture alignment, athletic proportions, foot sizing, bald scalp selection, bounded floor density, foot-pose interpolation and hover behavior. The test suite uses Node's runner through tsx. See context.md for reference research, decisions, TDD evidence and known limits.
 
 ## Implementation
 
@@ -27,9 +27,9 @@ Eighteen tests cover deterministic aircraft, finite targets, valid allocation, m
 - GSAP ScrollTrigger scrubs an absolute 0–1 timeline across the sticky story; Lenis shares GSAP's animation ticker.
 - Three.js manages WebGL buffers; GLSL interpolates a baked skeletal walk, staggers particle morphing, adds dispersion and draws tiny dash-shaped particles.
 - 18,000 points on desktop, 10,000 on mobile at initialization; device pixel ratio capped at 1.75.
-- Human particles are sampled deterministically from 32,600 mesh vertices animated by 65 bones. A 32-frame, 4.65 MB local half-float texture stores positions and surface lighting; only two texture reads per particle are needed each frame. Source textures and the raw mesh are never sent to the browser.
-- `npm run bake:human` rebuilds `public/motion/human-walk.bin` and `lib/foot-contacts.json` from the offline sources. See `assets/source/NOTICE.md` for provenance. Loading is abortable and has an explicit error state.
-- Bind-space tailoring preserves the source waist height and width, adds only 2% upper-torso width, and reduces both feet by 10%. Brighter double-ring ground ripples follow measured foot contact and fade before the airplane chapter.
+- Human particles are sampled deterministically from 21,877 mesh vertices animated by 65 bones. A 32-frame, 4.65 MB local half-float texture stores positions and surface lighting; only two texture reads per particle are needed each frame. Source textures and the raw mesh are never sent to the browser.
+- `npm run bake:human` rebuilds `public/motion/human-walk.bin` and `lib/foot-motion.json` from the offline sources. See `assets/source/NOTICE.md` for provenance. Loading is abortable and has an explicit error state.
+- Bind-space tailoring preserves the source waist height and width, adds only 2% upper-torso width, and reduces both feet by 10%. A compact circular particle floor reacts beneath the moving feet and fades before the airplane chapter. The hair mesh is excluded, retaining the anatomical scalp.
 - No new runtime dependencies, postprocessing or physics libraries.
 - WebGL initialization, shader failure and lost-context states show explicit recovery messages. GPU resources and event listeners are disposed on unmount.
 

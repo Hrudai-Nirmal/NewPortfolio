@@ -42,7 +42,7 @@ export async function createHumanMotion(count: number, seed = 71) {
     const meshes: SkinnedMesh[] = [];
     const bones = new Set<string>();
     root.traverse((object) => {
-      if (object instanceof SkinnedMesh && !/Eyes|Eyelashes/.test(object.name)) {
+      if (object instanceof SkinnedMesh && !/Eyes|Eyelashes|Hair/i.test(object.name)) {
         meshes.push(object);
         object.skeleton.bones.forEach((bone) => bones.add(bone.name));
       }
@@ -210,7 +210,17 @@ export async function createHumanMotion(count: number, seed = 71) {
       return { positions, lighting };
     }
     return {
-      duration: clip.duration, vertexCount, boneCount: bones.size,
+      duration: clip.duration, vertexCount, boneCount: bones.size, surfaceNames: meshes.map((mesh) => mesh.name),
+      /** Track the sole centers so the floor responds to the moving feet rather than a timed ring. */
+      sampleFeet(time: number) {
+        preparePose(time);
+        return ['Left', 'Right'].flatMap((side) => {
+          const ankle = root.getObjectByName(`mixamorig${side}Foot`);
+          const toe = root.getObjectByName(`mixamorig${side}ToeBase`);
+          if (!ankle || !toe) throw new Error(`Missing ${side} foot bones.`);
+          return ankle.getWorldPosition(new Vector3()).lerp(toe.getWorldPosition(new Vector3()), .5).sub(center).multiplyScalar(scale).toArray();
+        });
+      },
       sampleSurface,
       /** Measure descending foot contact from the animated rig instead of guessing alternating timer offsets. */
       getFootContacts() {

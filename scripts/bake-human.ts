@@ -11,7 +11,7 @@ async function bakeHuman() {
       const atlas = encodeHumanAtlas(frames.map((frame) => frame.positions), 1.15, frames.map((frame) => frame.lighting));
       await mkdir(new URL('../public/motion/', import.meta.url), { recursive: true });
       await writeFile(new URL('../public/motion/human-walk.bin', import.meta.url), new Uint8Array(atlas));
-      await writeFile(new URL('../lib/foot-contacts.json', import.meta.url), JSON.stringify(motion.getFootContacts(), null, 2) + '\n');
+      await writeFile(new URL('../lib/foot-motion.json', import.meta.url), JSON.stringify({ floorHeight: Math.min(...motion.getFootContacts().map((contact) => contact.position[1])) - .015, frames: Array.from({ length: 32 }, (_, frame) => motion.sampleFeet(frame / 32 * motion.duration)) }, null, 2) + '\n');
       process.stdout.write(`Baked ${motion.vertexCount} source vertices and ${motion.boneCount} bones into ${atlas.byteLength} bytes.\n`);
     } finally { motion.dispose(); }
   } catch (error) {

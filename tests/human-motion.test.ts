@@ -67,3 +67,18 @@ test('footfall markers alternate and stay attached to the grounded feet', async 
     } finally { human.dispose(); }
   } catch (error) { throw error; }
 });
+
+test('the bald silhouette excludes hair while retaining the anatomical scalp and foot motion', async () => {
+  try {
+    const human = await createHumanMotion(100);
+    try {
+      assert.ok(human.surfaceNames.some((name) => /Body/.test(name)));
+      assert.ok(human.surfaceNames.every((name) => !/Hair/i.test(name)));
+      const first = human.sampleFeet(0);
+      assert.equal(first.length, 6);
+      assert.ok(first.every(Number.isFinite));
+      assert.notDeepEqual(first, human.sampleFeet(human.duration / 2));
+      assert.deepEqual(first, human.sampleFeet(human.duration));
+    } finally { human.dispose(); }
+  } catch (error) { throw error; }
+});

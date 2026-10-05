@@ -1,8 +1,8 @@
 /** A disposable WebGL controller; React and the scroll timeline never touch GPU buffer details. */
 import * as THREE from 'three';
 import { advanceHoverState, getHoverTarget } from './particle-hover';
-import footContacts from './foot-contacts.json';
-import { getFootstepRipple } from './footsteps';
+import footMotion from './foot-motion.json';
+import { createFloorParticles, sampleFloorFeet, FLOOR_VERTEX_SHADER, FLOOR_FRAGMENT_SHADER } from './particle-floor';
 import { parseHumanAtlas } from './human-atlas';
 import { createParticleModel, getParticleScale } from './particle-model';
 import { PARTICLE_FRAGMENT_SHADER, PARTICLE_VERTEX_SHADER } from './particle-shaders';
@@ -42,28 +42,24 @@ export function createParticleScene(canvas: HTMLCanvasElement, onError: (message
   particles.frustumCulled = false;
   particles.visible = false;
   scene.add(particles);
-  const rippleGroup = new THREE.Group();
-  particles.add(rippleGroup);
-  const rippleGeometry = new THREE.PlaneGeometry(2, 2);
-  const ripples = footContacts.map((contact) => {
-    const rippleMaterial = new THREE.ShaderMaterial({
-      transparent: true, depthWrite: false, side: THREE.DoubleSide,
-      uniforms: { uOpacity: { value: 0 } },
-      vertexShader: `varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
-      fragmentShader: `varying vec2 vUv; uniform float uOpacity;
-        void main() {
-          float radius = length(vUv * 2.0 - 1.0);
-          float outerRing = 1.0 - smoothstep(.02, .065, abs(radius - .90));
-          float innerRing = 1.0 - smoothstep(.015, .045, abs(radius - .62));
-          gl_FragColor = vec4(vec3(.86, .89, .90), (outerRing + innerRing * .45) * uOpacity);
-        }`,
-    });
-    const ring = new THREE.Mesh(rippleGeometry, rippleMaterial);
-    ring.rotation.x = -Math.PI / 2;
-    ring.position.fromArray(contact.position);
-    rippleGroup.add(ring);
-    return { ring, contact, material: rippleMaterial };
+  const floorRadius = 1.05;
+  const floorModel = createFloorParticles(window.innerWidth < 700 ? 1600 : 2400, floorRadius, footMotion.floorHeight);
+  const floorGeometry = new THREE.BufferGeometry();
+  floorGeometry.setAttribute('position', new THREE.BufferAttribute(floorModel.positions, 3));
+  floorGeometry.setAttribute('aSeed', new THREE.BufferAttribute(floorModel.seeds, 1));
+  const floorUniforms = {
+    uLeftFoot: { value: new THREE.Vector3() }, uRightFoot: { value: new THREE.Vector3() },
+    uFloorHeight: { value: footMotion.floorHeight }, uRadius: { value: floorRadius },
+    uPixelRatio: uniforms.uPixelRatio, uMorph: uniforms.uMorph, uReducedMotion: uniforms.uReducedMotion,
+    uHover: uniforms.uHover, uViewport: uniforms.uViewport,
+  };
+  const floorMaterial = new THREE.ShaderMaterial({
+    uniforms: floorUniforms, vertexShader: FLOOR_VERTEX_SHADER, fragmentShader: FLOOR_FRAGMENT_SHADER,
+    transparent: true, depthWrite: false,
   });
+  const floor = new THREE.Points(floorGeometry, floorMaterial);
+  floor.frustumCulled = false;
+  particles.add(floor);
   let hasFailed = false;
   let isDisposed = false;
   const abortController = new AbortController();
@@ -111,7 +107,7 @@ export function createParticleScene(canvas: HTMLCanvasElement, onError: (message
     const visibleHeight = 2 * Math.tan(THREE.MathUtils.degToRad(19)) * camera.position.z;
     const isMobile = width < 700;
     particles.position.x = isMobile ? 0 : visibleHeight * camera.aspect * .17;
-    particles.position.y = isMobile ? -visibleHeight * 80 / height : .02;
+    particles.position.y = isMobile ? -visibleHeight * 80 / height : .02 + .16 * (1 - uniforms.uMorph.value);
     particles.scale.setScalar(getParticleScale(width, height, uniforms.uMorph.value));
     uniforms.uPixelRatio.value = ratio;
     uniforms.uViewport.value.set(width, height);
@@ -160,16 +156,16 @@ export function createParticleScene(canvas: HTMLCanvasElement, onError: (message
       uniforms.uTime.value = time;
       uniforms.uMorph.value = morph;
       particles.scale.setScalar(getParticleScale(canvas.clientWidth, canvas.clientHeight, morph));
+      // Reserve room for the ground disk above the footer while preserving the aircraft framing.
+      if (canvas.clientWidth >= 700) particles.position.y = .02 + .16 * (1 - morph);
       uniforms.uReducedMotion.value = Number(isReducedMotion);
       if (isReducedMotion) uniforms.uPointer.value.set(0, 0);
       else if (!isPaused) uniforms.uPointer.value.lerp(pointerTarget, .025);
-      rippleGroup.rotation.y = 1.03 + uniforms.uPointer.value.x * .13;
-      rippleGroup.position.y = uniforms.uPointer.value.y * .06;
-      for (const ripple of ripples) {
-        const state = getFootstepRipple(time, uniforms.uWalkDuration.value, ripple.contact, morph, isReducedMotion);
-        ripple.ring.scale.setScalar(state.radius);
-        ripple.material.uniforms.uOpacity.value = state.opacity;
-      }
+      floor.rotation.y = 1.03 + uniforms.uPointer.value.x * .13;
+      floor.position.y = uniforms.uPointer.value.y * .06;
+      const feet = sampleFloorFeet(footMotion.frames, time, uniforms.uWalkDuration.value);
+      floorUniforms.uLeftFoot.value.fromArray(feet, 0);
+      floorUniforms.uRightFoot.value.fromArray(feet, 3);
       renderer.render(scene, camera);
     },
     /** Release GPU memory and DOM subscriptions when the React tree unmounts. */
@@ -183,8 +179,8 @@ export function createParticleScene(canvas: HTMLCanvasElement, onError: (message
       window.removeEventListener('pointerout', handlePointerExit);
       window.removeEventListener('pointercancel', resetPointer);
       canvas.removeEventListener('webglcontextlost', handleContextLoss);
-      rippleGeometry.dispose();
-      ripples.forEach((ripple) => ripple.material.dispose());
+      floorGeometry.dispose();
+      floorMaterial.dispose();
       geometry.dispose();
       material.dispose();
       renderer.dispose();
