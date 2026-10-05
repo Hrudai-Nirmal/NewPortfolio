@@ -1,6 +1,7 @@
 /** Build a deterministic surface-bound point cloud from a detailed Mixamo mesh and authored walk. */
 import { readFile } from 'node:fs/promises';
 import { AnimationClip, AnimationMixer, Box3, SkinnedMesh, Vector3, Quaternion } from 'three';
+import { reshapeHumanPoint, resizeHumanFoot } from './human-proportions';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
 type SurfaceFace = { mesh: SkinnedMesh; vertices: [number, number, number]; cumulativeArea: number };
@@ -48,6 +49,48 @@ export async function createHumanMotion(count: number, seed = 71) {
     });
     if (meshes.length === 0) throw new Error('The source has no skinned human surfaces.');
     root.updateMatrixWorld(true);
+    const bindBounds = new Box3();
+    const bindPoint = new Vector3();
+    for (const mesh of meshes) {
+      const positions = mesh.geometry.getAttribute('position');
+      for (let index = 0; index < positions.count; index++) {
+        bindPoint.fromBufferAttribute(positions, index).applyMatrix4(mesh.matrixWorld);
+        bindBounds.expandByPoint(bindPoint);
+      }
+    }
+    const ankles = ['LeftFoot', 'RightFoot'].map((name) => {
+      const bone = root.getObjectByName(`mixamorig${name}`);
+      if (!bone) throw new Error(`Missing ankle bone: ${name}`);
+      return reshapeHumanPoint(bone.getWorldPosition(new Vector3()), bindBounds);
+    });
+    function reshapeBindPoint(point: Vector3) {
+      reshapeHumanPoint(point, bindBounds);
+      const ankle = Math.abs(point.x - ankles[0].x) < Math.abs(point.x - ankles[1].x) ? ankles[0] : ankles[1];
+      return resizeHumanFoot(point, ankle, bindBounds.min.y);
+    }
+    const boneTargets = new Map<import('three').Bone, Vector3>();
+    for (const mesh of meshes) for (const bone of mesh.skeleton.bones) {
+      if (!boneTargets.has(bone)) boneTargets.set(bone, reshapeBindPoint(bone.getWorldPosition(new Vector3())));
+    }
+    for (const mesh of meshes) {
+      const positions = mesh.geometry.getAttribute('position');
+      for (let index = 0; index < positions.count; index++) {
+        bindPoint.fromBufferAttribute(positions, index).applyMatrix4(mesh.matrixWorld);
+        reshapeBindPoint(bindPoint);
+        mesh.worldToLocal(bindPoint);
+        positions.setXYZ(index, bindPoint.x, bindPoint.y, bindPoint.z);
+      }
+      positions.needsUpdate = true;
+    }
+    // Move joints with the tailored skin before rebuilding inverse bind matrices; otherwise knees and waist would drift.
+    root.traverse((object) => {
+      const target = boneTargets.get(object as import('three').Bone);
+      if (!target) return;
+      object.position.copy(object.parent ? object.parent.worldToLocal(target.clone()) : target);
+      object.updateMatrixWorld(true);
+    });
+    root.updateMatrixWorld(true);
+    for (const mesh of meshes) mesh.bind(mesh.skeleton, mesh.matrixWorld);
     const hip = root.getObjectByName('mixamorigHips');
     if (!hip) throw new Error('The expected Mixamo hip bone is missing.');
     const spine = root.getObjectByName('mixamorigSpine');
@@ -169,6 +212,34 @@ export async function createHumanMotion(count: number, seed = 71) {
     return {
       duration: clip.duration, vertexCount, boneCount: bones.size,
       sampleSurface,
+      /** Measure descending foot contact from the animated rig instead of guessing alternating timer offsets. */
+      getFootContacts() {
+        const contactFrames = 64;
+        return ['LeftFoot', 'RightFoot'].map((name) => {
+          const foot = root.getObjectByName(`mixamorig${name}`);
+          if (!foot) throw new Error(`Missing foot bone: ${name}`);
+          const path = Array.from({ length: contactFrames }, (_, frame) => {
+            preparePose(frame / contactFrames * clip.duration);
+            return foot.getWorldPosition(new Vector3()).sub(center).multiplyScalar(scale);
+          });
+          const threshold = Math.min(...path.map((point) => point.y)) + .035;
+          const impact = path.findIndex((point, frame) => point.y <= threshold && path[(frame + contactFrames - 1) % contactFrames].y > threshold);
+          if (impact < 0) throw new Error(`No descending ground contact for ${name}`);
+          preparePose(impact / contactFrames * clip.duration);
+          let floorHeight = Infinity;
+          for (const mesh of meshes.filter((mesh) => /Shoes/.test(mesh.name))) {
+            mesh.skeleton.update();
+            for (let index = 0; index < mesh.geometry.getAttribute('position').count; index++) {
+              mesh.getVertexPosition(index, vertex).applyMatrix4(mesh.matrixWorld).sub(center).multiplyScalar(scale);
+              floorHeight = Math.min(floorHeight, vertex.y);
+            }
+          }
+          if (!Number.isFinite(floorHeight)) throw new Error('No shoe surface available for floor contact.');
+          const position = path[impact].clone();
+          position.y = floorHeight + .008;
+          return { phase: impact / contactFrames, position: position.toArray() };
+        });
+      },
       /** Report sagittal alignment from the posed skeleton for animation regression checks. */
       samplePosture(time: number) {
         preparePose(time);

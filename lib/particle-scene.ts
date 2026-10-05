@@ -1,6 +1,8 @@
 /** A disposable WebGL controller; React and the scroll timeline never touch GPU buffer details. */
 import * as THREE from 'three';
 import { advanceHoverState, getHoverTarget } from './particle-hover';
+import footContacts from './foot-contacts.json';
+import { getFootstepRipple } from './footsteps';
 import { parseHumanAtlas } from './human-atlas';
 import { createParticleModel, getParticleScale } from './particle-model';
 import { PARTICLE_FRAGMENT_SHADER, PARTICLE_VERTEX_SHADER } from './particle-shaders';
@@ -40,6 +42,27 @@ export function createParticleScene(canvas: HTMLCanvasElement, onError: (message
   particles.frustumCulled = false;
   particles.visible = false;
   scene.add(particles);
+  const rippleGroup = new THREE.Group();
+  particles.add(rippleGroup);
+  const rippleGeometry = new THREE.PlaneGeometry(2, 2);
+  const ripples = footContacts.map((contact) => {
+    const rippleMaterial = new THREE.ShaderMaterial({
+      transparent: true, depthWrite: false, side: THREE.DoubleSide,
+      uniforms: { uOpacity: { value: 0 } },
+      vertexShader: `varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
+      fragmentShader: `varying vec2 vUv; uniform float uOpacity;
+        void main() {
+          float radius = length(vUv * 2.0 - 1.0);
+          float ring = 1.0 - smoothstep(.012, .035, abs(radius - .92));
+          gl_FragColor = vec4(vec3(.72, .76, .78), ring * uOpacity);
+        }`,
+    });
+    const ring = new THREE.Mesh(rippleGeometry, rippleMaterial);
+    ring.rotation.x = -Math.PI / 2;
+    ring.position.fromArray(contact.position);
+    rippleGroup.add(ring);
+    return { ring, contact, material: rippleMaterial };
+  });
   let hasFailed = false;
   let isDisposed = false;
   const abortController = new AbortController();
@@ -139,6 +162,13 @@ export function createParticleScene(canvas: HTMLCanvasElement, onError: (message
       uniforms.uReducedMotion.value = Number(isReducedMotion);
       if (isReducedMotion) uniforms.uPointer.value.set(0, 0);
       else if (!isPaused) uniforms.uPointer.value.lerp(pointerTarget, .025);
+      rippleGroup.rotation.y = 1.03 + uniforms.uPointer.value.x * .13;
+      rippleGroup.position.y = uniforms.uPointer.value.y * .06;
+      for (const ripple of ripples) {
+        const state = getFootstepRipple(time, uniforms.uWalkDuration.value, ripple.contact, morph, isReducedMotion);
+        ripple.ring.scale.setScalar(state.radius);
+        ripple.material.uniforms.uOpacity.value = state.opacity;
+      }
       renderer.render(scene, camera);
     },
     /** Release GPU memory and DOM subscriptions when the React tree unmounts. */
@@ -152,6 +182,8 @@ export function createParticleScene(canvas: HTMLCanvasElement, onError: (message
       window.removeEventListener('pointerout', handlePointerExit);
       window.removeEventListener('pointercancel', resetPointer);
       canvas.removeEventListener('webglcontextlost', handleContextLoss);
+      rippleGeometry.dispose();
+      ripples.forEach((ripple) => ripple.material.dispose());
       geometry.dispose();
       material.dispose();
       renderer.dispose();

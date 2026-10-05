@@ -61,3 +61,13 @@ Next.js/React provide the requested application and component runtime (MIT). Thr
 
 ## Delivery preference
 - The user explicitly requested on 2026-10-05 that changes always be committed and pushed. This is recorded in AGENTS.md and applies to future completed changes in this project.
+
+
+## Athletic proportions and footfalls (2026-10-05)
+- User requested a fitter silhouette, a slightly raised waistline, subtle footfall ripples, and feet reduced by 10%.
+- Tailor the mesh and skeleton together in bind space before generating particles: waist width/depth taper peaks at 16%/17%, upper-torso width increases up to 8%, and the waist lifts by 3.5% of standing height with smooth falloff. Head and floor anchors stay fixed. Recalculate inverse bind matrices to keep skin and joints aligned.
+- Feet shrink 10% in all dimensions around their ankle/floor anchors, smoothly blending above the ankle into the lower leg. The authored gait and upright posture pass remain intact.
+- Bake two alternating foot-contact events from descending ankle trajectories, locating the floor from the posed shoe surfaces. Store these alongside the atlas in lib/foot-contacts.json. The same bake command regenerates both outputs.
+- Two faint ground-plane rings expand for 0.52 seconds at contact. They share the walk clock, freeze when paused, disappear under reduced motion, and fade out early in the aircraft morph. Ring geometry/materials are disposed with the scene.
+- TDD: new proportion and foot-size tests failed before implementation, then passed exact scaling, floor/head anchoring, symmetry and monotonic remapping. Contact/ripple tests failed before the APIs existed, then passed alternation, floor placement, cyclic timing, expansion, decay and reduced-motion/morph suppression.
+- Verification: all 18 tests, typecheck and production build pass. Browser preview shows the revised figure without shader/runtime warnings. No new dependencies.

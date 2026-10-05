@@ -51,3 +51,19 @@ test('torso stays upright and the face looks slightly down throughout the stride
     } finally { human.dispose(); }
   } catch (error) { throw error; }
 });
+
+test('footfall markers alternate and stay attached to the grounded feet', async () => {
+  try {
+    const human = await createHumanMotion(100);
+    try {
+      const contacts = human.getFootContacts();
+      assert.equal(contacts.length, 2);
+      const separation = Math.abs(contacts[0].phase - contacts[1].phase);
+      assert.ok(separation > .35 && separation < .65);
+      for (const contact of contacts) {
+        assert.ok(contact.position.every(Number.isFinite));
+        assert.ok(contact.position[1] < -1.3 && contact.position[1] > -1.9);
+      }
+    } finally { human.dispose(); }
+  } catch (error) { throw error; }
+});

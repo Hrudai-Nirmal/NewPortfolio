@@ -19,7 +19,7 @@ npm run typecheck
 npm run build
 ```
 
-Thirteen tests cover deterministic aircraft, finite targets, valid allocation, morph endpoints, pausing, responsive framing, accessible markup, timeline refresh, skinned human continuity, grounded stride, binary asset validation, surface lighting, posture alignment and hover behavior. The test suite uses Node's runner through tsx. See context.md for reference research, decisions, TDD evidence and known limits.
+Eighteen tests cover deterministic aircraft, finite targets, valid allocation, morph endpoints, pausing, responsive framing, accessible markup, timeline refresh, skinned human continuity, grounded stride, binary asset validation, surface lighting, posture alignment, athletic proportions, foot sizing, footfall timing, ripple decay and hover behavior. The test suite uses Node's runner through tsx. See context.md for reference research, decisions, TDD evidence and known limits.
 
 ## Implementation
 
@@ -28,7 +28,8 @@ Thirteen tests cover deterministic aircraft, finite targets, valid allocation, m
 - Three.js manages WebGL buffers; GLSL interpolates a baked skeletal walk, staggers particle morphing, adds dispersion and draws tiny dash-shaped particles.
 - 18,000 points on desktop, 10,000 on mobile at initialization; device pixel ratio capped at 1.75.
 - Human particles are sampled deterministically from 32,600 mesh vertices animated by 65 bones. A 32-frame, 4.65 MB local half-float texture stores positions and surface lighting; only two texture reads per particle are needed each frame. Source textures and the raw mesh are never sent to the browser.
-- `npm run bake:human` rebuilds `public/motion/human-walk.bin` from the offline sources. See `assets/source/NOTICE.md` for provenance. Loading is abortable and has an explicit error state.
+- `npm run bake:human` rebuilds `public/motion/human-walk.bin` and `lib/foot-contacts.json` from the offline sources. See `assets/source/NOTICE.md` for provenance. Loading is abortable and has an explicit error state.
+- Bind-space tailoring raises and tapers the waist, slightly broadens the upper torso, and reduces both feet by 10%. Subtle ground ripples follow measured foot contact and fade before the airplane chapter.
 - No new runtime dependencies, postprocessing or physics libraries.
 - WebGL initialization, shader failure and lost-context states show explicit recovery messages. GPU resources and event listeners are disposed on unmount.
 
