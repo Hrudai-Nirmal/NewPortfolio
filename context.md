@@ -49,3 +49,15 @@ Next.js/React provide the requested application and component runtime (MIT). Thr
 ## Repository
 - Initialized on `main` with origin `https://github.com/Hrudai-Nirmal/NewPortfolio.git` on 2026-10-05.
 - Source, motion assets, screenshots, documentation, lockfile and tests are versioned. Installed dependencies, Next.js build output and TypeScript build caches remain excluded by `.gitignore`.
+
+
+## Posture and hover revision (2026-10-05)
+- The user requested a slightly lowered face, upright torso, and hover effects on every particle form.
+- Fixed posture in the source skeleton before skinning/baking: align the spine-to-neck sagittal direction vertically and set the face to a six-degree downward gaze, retaining authored head yaw, lateral body sway, arms and legs. Restore authored quaternions before each mixer evaluation so corrections cannot accumulate on repeated samples.
+- Added a screen-space cursor field after morph projection. A 110 CSS-pixel radius repels nearby particles up to 34 pixels and increases their brightness/size. The same field covers human, aircraft and in-between particles, with frame-time-based easing and smooth release on pointer exit/blur.
+- Touch does not activate hover. Pause freezes the field; reduced motion disables it. Pointer subscriptions are removed with scene disposal. No dependency changes.
+- TDD: posture regression measured the original backward lean (-0.0986 radians), then passed across 16 stride phases with upright torso/downward face. Hover tests first failed on the missing module, then passed canvas-local mapping, touch/outside rejection, easing consistency, release, pause and reduced-motion contracts.
+- All 13 tests, typecheck and production build pass. Browser verification confirms corrected posture, repulsion on human and aircraft, the mid-morph cursor field, and no console shader/runtime warnings. Preview remains on http://127.0.0.1:3000/.
+
+## Delivery preference
+- The user explicitly requested on 2026-10-05 that changes always be committed and pushed. This is recorded in AGENTS.md and applies to future completed changes in this project.

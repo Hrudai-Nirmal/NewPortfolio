@@ -38,3 +38,16 @@ test('a detailed skinned human walks through a seamless, grounded cycle', async 
     human.dispose();
   } catch (error) { throw error; }
 });
+
+test('torso stays upright and the face looks slightly down throughout the stride', async () => {
+  try {
+    const human = await createHumanMotion(100);
+    try {
+      for (let frame = 0; frame < 16; frame++) {
+        const posture = human.samplePosture(frame / 16 * human.duration);
+        assert.ok(Math.abs(posture.torsoLean) < .025, `torso leans ${posture.torsoLean} radians`);
+        assert.ok(posture.facePitch < -.07 && posture.facePitch > -.15, `face pitch ${posture.facePitch} radians`);
+      }
+    } finally { human.dispose(); }
+  } catch (error) { throw error; }
+});

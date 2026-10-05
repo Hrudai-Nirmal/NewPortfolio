@@ -1,4 +1,6 @@
 /** GPU frame interpolation preserves detailed skeletal motion while scroll remaps the same points into aircraft. */
+import { HOVER_RADIUS, HOVER_DISPLACEMENT } from './particle-hover';
+
 export const PARTICLE_VERTEX_SHADER = /* glsl */ `
   attribute vec3 aAirplane;
   attribute vec3 aScatter;
@@ -14,6 +16,8 @@ export const PARTICLE_VERTEX_SHADER = /* glsl */ `
   uniform float uPixelRatio;
   uniform float uReducedMotion;
   uniform vec2 uPointer;
+  uniform vec3 uHover;
+  uniform vec2 uViewport;
   varying float vOpacity;
   varying float vSeed;
 
@@ -48,10 +52,18 @@ export const PARTICLE_VERTEX_SHADER = /* glsl */ `
     point.y += uPointer.y * .06;
     vec4 viewPosition = modelViewMatrix * vec4(point, 1.0);
     gl_Position = projectionMatrix * viewPosition;
+    // Apply the interaction after projection so its radius follows CSS pixels, not model depth.
+    vec2 cursorDelta = (gl_Position.xy / gl_Position.w - uHover.xy) * uViewport * .5;
+    float cursorDistance = length(cursorDelta);
+    float hover = pow(1.0 - smoothstep(0.0, ${HOVER_RADIUS.toFixed(1)}, cursorDistance), 2.0) * uHover.z;
+    vec2 pushDirection = cursorDistance > .01 ? cursorDelta / cursorDistance : vec2(cos(aSeed * 6.283), sin(aSeed * 6.283));
+    gl_Position.xy += pushDirection * hover * ${HOVER_DISPLACEMENT.toFixed(1)} * 2.0 / uViewport * gl_Position.w;
     gl_PointSize = clamp(mix(1.6 + aSeed * 1.7, 2.4 + aSeed * 2.2, morph) * uPixelRatio * (6.0 / -viewPosition.z), 1.0, 10.0);
     vOpacity = (.22 + pow(aSeed, 2.0) * .68) * (1.0 - .3 * energy);
     vOpacity *= mix(surface.w, 1.0, morph);
     vOpacity *= clamp(1.1 + point.z * .13, .3, 1.0);
+    gl_PointSize *= 1.0 + hover * .4;
+    vOpacity = min(1.0, vOpacity + hover * .35);
     vSeed = aSeed;
   }
 `;

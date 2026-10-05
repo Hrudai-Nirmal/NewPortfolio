@@ -12,4 +12,4 @@ These assets are governed by Mixamo's terms, not the MIT license of Three.js or 
 
 The 48.8 MB original mesh remains an offline build/test input in this directory. Its textures are discarded by the bake pipeline. Only the integrated 4.65 MB particle motion atlas under `public/motion/` is loaded by the website. No source model or animation was downloaded from Aaru.
 
-Rebuild with `npm run bake:human`. The bake uses deterministic area-weighted sampling, barycentric skin attachment, 32 authored poses, half-float quantization and pose-dependent surface lighting. The source clip is played at a relaxed 1.15-second cycle. The source mesh and walk are retained so this output can be reproduced and tested.
+Rebuild with `npm run bake:human`. The bake uses deterministic area-weighted sampling, barycentric skin attachment, 32 authored poses, half-float quantization and pose-dependent surface lighting. A skeletal posture pass aligns the torso upright and lowers the gaze by six degrees before baking. The source clip is played at a relaxed 1.15-second cycle. The source mesh and walk are retained so this output can be reproduced and tested.

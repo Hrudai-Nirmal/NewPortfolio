@@ -1,6 +1,6 @@
 /** Build a deterministic surface-bound point cloud from a detailed Mixamo mesh and authored walk. */
 import { readFile } from 'node:fs/promises';
-import { AnimationClip, AnimationMixer, Box3, SkinnedMesh, Vector3 } from 'three';
+import { AnimationClip, AnimationMixer, Box3, SkinnedMesh, Vector3, Quaternion } from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
 type SurfaceFace = { mesh: SkinnedMesh; vertices: [number, number, number]; cumulativeArea: number };
@@ -50,6 +50,10 @@ export async function createHumanMotion(count: number, seed = 71) {
     root.updateMatrixWorld(true);
     const hip = root.getObjectByName('mixamorigHips');
     if (!hip) throw new Error('The expected Mixamo hip bone is missing.');
+    const spine = root.getObjectByName('mixamorigSpine');
+    const neck = root.getObjectByName('mixamorigNeck');
+    const head = root.getObjectByName('mixamorigHead');
+    if (!spine?.parent || !neck || !head?.parent) throw new Error('The posture bones are missing.');
     const clipDocument = JSON.parse(await readFile(new URL('../assets/source/walk.json', import.meta.url), 'utf8'));
     const clip = AnimationClip.parse(clipDocument);
     const hipRest = hip.position.clone();
@@ -118,11 +122,34 @@ export async function createHumanMotion(count: number, seed = 71) {
     }
     const mixer = new AnimationMixer(root);
     mixer.clipAction(clip).play();
+    const spineBase = spine.quaternion.clone();
+    const headBase = head.quaternion.clone();
+    const preparePose = (time: number) => {
+      if (!Number.isFinite(time) || time < 0) throw new RangeError('Frame time must be finite and nonnegative.');
+      // Restore authored values before mixing: repeated samples must not accumulate corrective rotations.
+      spine.quaternion.copy(spineBase);
+      head.quaternion.copy(headBase);
+      mixer.setTime(time % clip.duration);
+      spineBase.copy(spine.quaternion);
+      headBase.copy(head.quaternion);
+      root.updateMatrixWorld(true);
+      const torso = neck.getWorldPosition(new Vector3()).sub(spine.getWorldPosition(new Vector3()));
+      const straighten = new Quaternion().setFromAxisAngle(new Vector3(1, 0, 0), -Math.atan2(torso.z, torso.y));
+      const spineWorld = spine.getWorldQuaternion(new Quaternion()).premultiply(straighten);
+      spine.quaternion.copy(spine.parent!.getWorldQuaternion(new Quaternion()).invert().multiply(spineWorld));
+      root.updateMatrixWorld(true);
+      // Keep the authored head yaw, with a six-degree downward gaze instead of an upturned chin.
+      const headWorld = head.getWorldQuaternion(new Quaternion());
+      const forward = new Vector3(0, 0, 1).applyQuaternion(headWorld);
+      const yaw = Math.atan2(forward.x, forward.z);
+      const downward = new Vector3(Math.sin(yaw) * Math.cos(.105), -Math.sin(.105), Math.cos(yaw) * Math.cos(.105));
+      const lowerChin = new Quaternion().setFromUnitVectors(forward, downward);
+      head.quaternion.copy(head.parent!.getWorldQuaternion(new Quaternion()).invert().multiply(headWorld.premultiply(lowerChin)));
+      root.updateMatrixWorld(true);
+    };
     /** Evaluate skinning before computing a surface normal, so lighting follows the pose. */
     function sampleSurface(time: number) {
-      if (!Number.isFinite(time) || time < 0) throw new RangeError('Frame time must be finite and nonnegative.');
-      mixer.setTime(time % clip.duration);
-      root.updateMatrixWorld(true);
+      preparePose(time);
       for (const mesh of meshes) mesh.skeleton.update();
       const positions = new Float32Array(count * 3);
       const lighting = new Float32Array(count);
@@ -142,6 +169,13 @@ export async function createHumanMotion(count: number, seed = 71) {
     return {
       duration: clip.duration, vertexCount, boneCount: bones.size,
       sampleSurface,
+      /** Report sagittal alignment from the posed skeleton for animation regression checks. */
+      samplePosture(time: number) {
+        preparePose(time);
+        const torso = neck.getWorldPosition(new Vector3()).sub(spine.getWorldPosition(new Vector3()));
+        const forward = new Vector3(0, 0, 1).applyQuaternion(head.getWorldQuaternion(new Quaternion()));
+        return { torsoLean: Math.atan2(torso.z, torso.y), facePitch: Math.atan2(forward.y, Math.hypot(forward.x, forward.z)) };
+      },
       /** Sample the same barycentric skin locations, including the exact loop seam. */
       sampleFrame(time: number) { return sampleSurface(time).positions; },
       /** Release source geometry after offline baking or verification. */

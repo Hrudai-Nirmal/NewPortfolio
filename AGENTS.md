@@ -7,3 +7,9 @@ This version has breaking changes — APIs, conventions, and file structure may 
 This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
 
 <!-- END:nextjs-agent-rules -->
+
+## Git delivery preference
+
+- After completing and verifying project changes, always commit them with a Conventional Commit message and push to the configured upstream without asking again.
+- Include relevant source, tests, generated motion assets, and documentation. Respect `.gitignore`; do not commit secrets, dependencies, or build caches.
+- Verify the push and report the commit. Never force-push or discard unrelated changes to satisfy this preference.

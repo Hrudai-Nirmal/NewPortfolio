@@ -9,7 +9,7 @@ npm install
 npm run dev
 ```
 
-Open http://127.0.0.1:3000. Scroll, use the Human / Flight buttons, or scrub the bottom progress rail. The rail supports arrow keys, Home and End. Pause freezes ambient movement; scrolling still changes the form. The OS reduced-motion preference disables gait, turbulence and smooth scrolling in favor of static endpoints.
+Open http://127.0.0.1:3000. Scroll, use the Human / Flight buttons, or scrub the bottom progress rail. The rail supports arrow keys, Home and End. Hover near either particle form to gently push and highlight nearby points. Pause freezes ambient movement and hover; scrolling still changes the form. The OS reduced-motion preference disables gait, turbulence and smooth scrolling in favor of static endpoints.
 
 ## Verify
 
@@ -19,7 +19,7 @@ npm run typecheck
 npm run build
 ```
 
-Ten tests cover deterministic aircraft, finite targets, valid allocation, morph endpoints, pausing, responsive framing, accessible markup, timeline refresh, skinned human continuity, grounded stride, binary asset validation and surface lighting. The test suite uses Node's runner through tsx. See context.md for reference research, decisions, TDD evidence and known limits.
+Thirteen tests cover deterministic aircraft, finite targets, valid allocation, morph endpoints, pausing, responsive framing, accessible markup, timeline refresh, skinned human continuity, grounded stride, binary asset validation, surface lighting, posture alignment and hover behavior. The test suite uses Node's runner through tsx. See context.md for reference research, decisions, TDD evidence and known limits.
 
 ## Implementation
 

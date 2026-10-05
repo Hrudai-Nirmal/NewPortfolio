@@ -1,5 +1,6 @@
 /** A disposable WebGL controller; React and the scroll timeline never touch GPU buffer details. */
 import * as THREE from 'three';
+import { advanceHoverState, getHoverTarget } from './particle-hover';
 import { parseHumanAtlas } from './human-atlas';
 import { createParticleModel, getParticleScale } from './particle-model';
 import { PARTICLE_FRAGMENT_SHADER, PARTICLE_VERTEX_SHADER } from './particle-shaders';
@@ -27,6 +28,7 @@ export function createParticleScene(canvas: HTMLCanvasElement, onError: (message
     uAtlasSize: { value: new THREE.Vector2(256, 1) }, uRowsPerFrame: { value: 1 },
     uFrameCount: { value: 2 }, uWalkDuration: { value: 1.15 },
     uTime: { value: 0 }, uMorph: { value: 0 }, uPixelRatio: { value: 1 },
+    uHover: { value: new THREE.Vector3() }, uViewport: { value: new THREE.Vector2(1, 1) },
     uReducedMotion: { value: 0 }, uPointer: { value: new THREE.Vector2() },
   };
   const material = new THREE.ShaderMaterial({
@@ -69,6 +71,9 @@ export function createParticleScene(canvas: HTMLCanvasElement, onError: (message
   }
   void loadHumanMotion();
   const pointerTarget = new THREE.Vector2();
+  let hoverTarget = { horizontal: 0, vertical: 0, strength: 0 };
+  let hoverState = { ...hoverTarget };
+  let previousFrameTime: number | undefined;
 
   function resizeScene() {
     const width = canvas.clientWidth;
@@ -85,11 +90,22 @@ export function createParticleScene(canvas: HTMLCanvasElement, onError: (message
     particles.position.y = isMobile ? -visibleHeight * 80 / height : .02;
     particles.scale.setScalar(getParticleScale(width, height, uniforms.uMorph.value));
     uniforms.uPixelRatio.value = ratio;
+    uniforms.uViewport.value.set(width, height);
   }
   function trackPointer(event: PointerEvent) {
-    pointerTarget.set(event.clientX / window.innerWidth * 2 - 1, 1 - event.clientY / window.innerHeight * 2);
+    const bounds = canvas.getBoundingClientRect();
+    if (bounds.width === 0 || bounds.height === 0) return;
+    hoverTarget = getHoverTarget(event.clientX, event.clientY, bounds, event.pointerType);
+    if (event.pointerType === 'touch') { resetPointer(); return; }
+    pointerTarget.set(hoverTarget.horizontal, hoverTarget.vertical);
   }
-  function resetPointer() { pointerTarget.set(0, 0); }
+  function resetPointer() {
+    pointerTarget.set(0, 0);
+    hoverTarget = { ...hoverTarget, strength: 0 };
+  }
+  function handlePointerExit(event: PointerEvent) {
+    if (!event.relatedTarget) resetPointer();
+  }
   function handleContextLoss(event: Event) {
     event.preventDefault();
     hasFailed = true;
@@ -103,6 +119,8 @@ export function createParticleScene(canvas: HTMLCanvasElement, onError: (message
   observer.observe(canvas);
   window.addEventListener('pointermove', trackPointer, { passive: true });
   window.addEventListener('blur', resetPointer);
+  window.addEventListener('pointerout', handlePointerExit);
+  window.addEventListener('pointercancel', resetPointer);
   canvas.addEventListener('webglcontextlost', handleContextLoss);
   resizeScene();
 
@@ -111,6 +129,10 @@ export function createParticleScene(canvas: HTMLCanvasElement, onError: (message
     /** Update shader uniforms without allocating geometry on the animation frame. */
     renderFrame(time: number, morph: number, isReducedMotion: boolean, isPaused: boolean) {
       if (hasFailed) return;
+      const deltaSeconds = previousFrameTime === undefined ? 1 / 60 : Math.max(0, time - previousFrameTime);
+      previousFrameTime = time;
+      hoverState = advanceHoverState(hoverState, hoverTarget, deltaSeconds, isPaused, isReducedMotion);
+      uniforms.uHover.value.set(hoverState.horizontal, hoverState.vertical, hoverState.strength);
       uniforms.uTime.value = time;
       uniforms.uMorph.value = morph;
       particles.scale.setScalar(getParticleScale(canvas.clientWidth, canvas.clientHeight, morph));
@@ -127,6 +149,8 @@ export function createParticleScene(canvas: HTMLCanvasElement, onError: (message
       observer.disconnect();
       window.removeEventListener('pointermove', trackPointer);
       window.removeEventListener('blur', resetPointer);
+      window.removeEventListener('pointerout', handlePointerExit);
+      window.removeEventListener('pointercancel', resetPointer);
       canvas.removeEventListener('webglcontextlost', handleContextLoss);
       geometry.dispose();
       material.dispose();
